@@ -268,7 +268,8 @@
         "sqllbProbeID":"[concat(variables('sqllbID'),'/probes/',variables('SQLAOProbe'))]",
         "sqlRDPNATRuleID":"[concat(variables('sqllbID'),'/inboundNatRules/',variables('RDPNAT'))]",
         "sqlBEAddressPoolID":"[concat(variables('sqllbID'),'/backendAddressPools/',variables('LBBE'))]",
-        "adDataDisk":"ADDataDisk",
+        "adPDCDataDisk":"ADPDCDataDisk",
+        "adBDCDataDisk":"ADBDCDataDisk",
         "adDataDiskSize":1000,
         "sqlDataDisk":"SQLDataDisk",
         "sqlDataDiskSize":1000,
@@ -595,7 +596,7 @@
                     "dataDisks": [
                         {
                             "vhd": {
-                                "uri":"[concat('http://',parameters('newStorageAccountName'),'.blob.core.windows.net/',parameters('vmContainerName'),'/', variables('adDataDisk'),'-1.vhd')]"
+                                "uri":"[concat('http://',parameters('newStorageAccountName'),'.blob.core.windows.net/',parameters('vmContainerName'),'/', variables('adPDCDataDisk'),'-1.vhd')]"
                                 },
                             "name":"[concat(variables('adPDCVMName'),'-data-disk1')]",
                             "caching" : "None",
@@ -626,8 +627,8 @@
                         "type": "DSC",
                         "typeHandlerVersion": "1.7",
                         "settings": {
-                            "ModulesUrl": "[variables('adModulesURL')]",
-                            "ConfigurationFunction": "[variables('adConfigurationFunction')]",
+                            "ModulesUrl": "[variables('adPDCModulesURL')]",
+                            "ConfigurationFunction": "[variables('adPDCConfigurationFunction')]",
                             "Properties": {
                                 "DomainName": "[parameters('domainName')]",
                                 "AdminCreds":{
@@ -676,7 +677,7 @@
                 "[resourceId('Microsoft.Storage/storageAccounts',parameters('newStorageAccountName'))]",
                 "[resourceId('Microsoft.Network/networkInterfaces',variables('adBDCNicName'))]",
                 "[resourceId('Microsoft.Compute/availabilitySets', variables('adAvailabilitySetName'))]",
-                "[resourceId('Microsoft.Compute/virtualMachines', variables('adPDCVMName'))]"
+                "Microsoft.Resources/deployments/UpdateVNetDNS1"
             ],
             "properties": {
                 "hardwareProfile": {
@@ -725,8 +726,7 @@
             "apiVersion": "2014-12-01-preview",
             "location": "[parameters('deploymentLocation')]",
             "dependsOn":[
-                "[concat('Microsoft.Compute/virtualMachines/', variables('adBDCVMName'))]",
-                "Microsoft.Resources/deployments/UpdateVNetDNS1"
+                "[concat('Microsoft.Compute/virtualMachines/', variables('adBDCVMName'))]"
             ],
             "properties": {
                 "publisher": "Microsoft.Powershell",
@@ -766,7 +766,7 @@
                 "parameters": {
                     "deploymentLocation": {"value":"[parameters('deploymentLocation')]"},
                     "virtualNetworkName": {"value":"[parameters('virtualNetworkName')]"},
-                    "virtualNetworkAddressRange": {"value":"[parameters('virtualNetworkAddressRange')]"},
+                    "virtualNetworkAddressRange": {"value":"[parameters('virtualNetworkPrefix')]"},
                     "subnetName": {"value":"[parameters('adSubnetName')]"},
                     "subnetRange": {"value":"[parameters('adSubnet')]"},
                     "DNSServerAddress": {"value":["[parameters('adPDCNicIPAddress')]","[parameters('adBDCNicIPAddress')]"]}
@@ -889,7 +889,7 @@
                     ]
                 }
             },
-        }
+        },
         {
             "type": "Microsoft.Compute/virtualMachines/extensions",
             "name": "[concat(variables('sqlwVMName'),'/CreateFileShareWitness')]",
