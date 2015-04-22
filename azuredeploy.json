@@ -271,11 +271,8 @@
         "adPDCDataDisk":"ADPDCDataDisk",
         "adBDCDataDisk":"ADBDCDataDisk",
         "adDataDiskSize":1000,
-        "sqlDataDisk":"SQLDataDisk",
         "sqlDataDiskSize":1000,
-        "sqlLogDisk": "SQLLogDisk",
         "sqlLogDiskSize":1000,
-        "witnessDataDisk":"WitnessDataDisk",
         "witnessDataDiskSize":1000,
         "publicIPAddressName": "publicIP",
         "sqlAvailabilitySetName":"sqlAvailabiltySet",
@@ -301,7 +298,11 @@
         "adBDCModulesURL":"[concat(parameters('AssetLocation'),'/CreateADBDC.ps1.zip')]",
         "adBDCConfigurationFunction":"CreateADBDC.ps1\\CreateADBDC",
         "fswModulesURL":"[concat(parameters('AssetLocation'),'/CreateFileShareWitness.ps1.zip')]",
-        "fswConfigurationFunction":"CreateFileShareWitness.ps1\\CreateFileShareWitness"
+        "fswConfigurationFunction":"CreateFileShareWitness.ps1\\CreateFileShareWitness",
+        "sqlAOPrepareModulesURL":"[concat(parameters('AssetLocation'),'/PrepareAlwaysOnSqlServer.ps1.zip')]",
+        "sqlAOPrepareConfigurationFunction":"PrepareAlwaysOnSqlServer.ps1\\PrepareAlwaysOnSqlServer"
+
+
     },
     "resources": [
         {
@@ -767,8 +768,7 @@
                     "deploymentLocation": {"value":"[parameters('deploymentLocation')]"},
                     "virtualNetworkName": {"value":"[parameters('virtualNetworkName')]"},
                     "virtualNetworkAddressRange": {"value":"[parameters('virtualNetworkPrefix')]"},
-                    "subnetName": {"value":"[parameters('adSubnetName')]"},
-                    "subnetRange": {"value":"[parameters('adSubnet')]"},
+                    "subnets": {"value":"[variables('subnets')]"},
                     "DNSServerAddress": {"value":["[parameters('adPDCNicIPAddress')]","[parameters('adBDCNicIPAddress')]"]}
                 }
             }
@@ -811,7 +811,7 @@
                      "dataDisks": [
                         {
                             "vhd": {
-                                "uri":"[concat('http://',parameters('newStorageAccountName'),'.blob.core.windows.net/',parameters('vmContainerName'),'/', variables('sqlDataDisk'), '-1.vhd')]"
+                                "uri":"[concat('http://',parameters('newStorageAccountName'),'.blob.core.windows.net/',parameters('vmContainerName'),'/', variables('sqlVMName'), copyindex(), '-Data-1.vhd')]"
                             },
                             "name":"[concat(variables('sqlVMName'), copyindex(),'-data-disk1')]",
                             "caching" : "None",
@@ -820,7 +820,7 @@
                         },
                         {
                             "vhd": {
-                                "uri":"[concat('http://',parameters('newStorageAccountName'),'.blob.core.windows.net/',parameters('vmContainerName'),'/', variables('sqlLogDisk'), '-1.vhd')]"
+                                "uri":"[concat('http://',parameters('newStorageAccountName'),'.blob.core.windows.net/',parameters('vmContainerName'),'/', variables('sqlVMName'), copyindex(), '-log.vhd')]"
                             },
                             "name":"[concat(variables('sqlVMName'), copyindex(),'-log-disk1')]",
                             "caching" : "None",
@@ -872,11 +872,11 @@
                     "dataDisks": [
                         {
                             "vhd": {
-                                "uri":"[concat('http://',parameters('newStorageAccountName'),'.blob.core.windows.net/',parameters('vmContainerName'),'/', variables('witnessDataDisk'),'-1.vhd')]"
+                                "uri":"[concat('http://',parameters('newStorageAccountName'),'.blob.core.windows.net/',parameters('vmContainerName'),'/', variables('sqlwVMName'),'-data-1.vhd')]"
                                 },
                             "name":"[concat(variables('sqlwVMName'),'-data-disk1')]",
                             "caching" : "None",
-                            "diskSizeGB": "[variables('fswDataDiskSize')]",
+                            "diskSizeGB": "[variables('witnessDataDiskSize')]",
                             "lun": 0
                         }
                     ]
@@ -907,11 +907,75 @@
                     "ConfigurationFunction": "[variables('fswConfigurationFunction')]",
                     "Properties": {
                         "DomainName": "[parameters('domainName')]",
+                        "SharePath":"[variables('sharePath')]",
                         "AdminCreds":{
                             "UserName": "[parameters('adminUserName')]",
                             "Password": "PrivateSettingsRef:AdminPassword"
-                        },
-                        "SharePath":"[variables('sharePath')]"
+                        }
+                    }
+                },
+                "protectedSettings": {
+                    "Items": {
+                        "AdminPassword": "[parameters('adminPassword')]"
+                    }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "name": "[concat(variables('sqlVMName'),'0/sqlAOPrepare')]",
+            "apiVersion": "2014-12-01-preview",
+            "location": "[parameters('deploymentLocation')]",
+            "dependsOn":[
+                "[concat('Microsoft.Compute/virtualMachines/', variables('sqlVMName'),'0)]",
+                "[concat('Microsoft.Compute/virtualMachines/',variables('sqlwVMName'),'/extensions/CreateFileShareWitness')]"
+
+            ],
+            "properties": {
+                "publisher": "Microsoft.Powershell",
+                "type": "DSC",
+                "typeHandlerVersion": "1.7",
+                "settings": {
+                    "ModulesUrl": "[variables('sqlAOPrepareModulesURL')]",
+                    "ConfigurationFunction": "[variables('sqlAOPrepareConfigurationFunction')]",
+                    "Properties": {
+                        "DomainName": "[parameters('domainName')]",
+                        "AdminCreds":{
+                            "UserName": "[parameters('adminUserName')]",
+                            "Password": "PrivateSettingsRef:AdminPassword"
+                        }
+                    }
+                },
+                "protectedSettings": {
+                    "Items": {
+                        "AdminPassword": "[parameters('adminPassword')]"
+                    }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "name": "[concat(variables('sqlVMName'),'1/sqlAOPrepare')]",
+            "apiVersion": "2014-12-01-preview",
+            "location": "[parameters('deploymentLocation')]",
+            "dependsOn":[
+                "[concat('Microsoft.Compute/virtualMachines/', variables('sqlVMName'),'1)]",
+                "[concat('Microsoft.Compute/virtualMachines/',variables('sqlwVMName'),'/extensions/CreateFileShareWitness')]"
+
+            ],
+            "properties": {
+                "publisher": "Microsoft.Powershell",
+                "type": "DSC",
+                "typeHandlerVersion": "1.7",
+                "settings": {
+                    "ModulesUrl": "[variables('sqlAOPrepareModulesURL')]",
+                    "ConfigurationFunction": "[variables('sqlAOPrepareConfigurationFunction')]",
+                    "Properties": {
+                        "DomainName": "[parameters('domainName')]",
+                        "AdminCreds":{
+                            "UserName": "[parameters('adminUserName')]",
+                            "Password": "PrivateSettingsRef:AdminPassword"
+                        }
                     }
                 },
                 "protectedSettings": {

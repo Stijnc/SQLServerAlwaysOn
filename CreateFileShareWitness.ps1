@@ -17,7 +17,7 @@ param
     [Int]$RetryIntervalSec=30
 )
 
-configuration FileShareWitness
+configuration CreateFileShareWitness
 {
     Import-DscResource -ModuleName xComputerManagement, xSmbShare, cDisk,xDisk
     
