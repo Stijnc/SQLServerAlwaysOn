@@ -226,13 +226,21 @@
             },
             "defaultValue":"https://raw.githubusercontent.com/azurermtemplates/azurermtemplates/master/sqlserver-alwaysonag-dsc"
         },
-        "DNSPrefix": {
+        "dnsPrefix": {
             "type":"string",
             "metadata": {
                 "Description": "The DNS Prefix for the Public IP Address"
             },
             "defaultValue":"New DNS Prefix"
+        },
+        "dataBaseNames": {
+            "type":"string",
+            "metadata": {
+                "Description": "An array of databases name, each database will be created and added to the availability group"
+            },
+            "defaultValue":"'testdb1','testdb2'"
         }
+
     },
     "variables": {
         "LBFE":"LBFE",
@@ -242,9 +250,9 @@
         "SQLAOProbe":"SQLAlwaysOnEndPointProbe",
         "staticSubnetName": "staticSubnet",
         "sqlSubnetName": "sqlSubnet",
-        "sqlAOEPName":"[concat(parameters('DNSPrefix'),'-hadr')]",
-        "sharePath":"[concat(parameters('DNSPrefix'),'-fsw')]",
-        "clusterName":"[concat(parameters('DNSPrefix'),'-fc')]",
+        "sqlAOEPName":"[concat(parameters('dnsPrefix'),'-hadr')]",
+        "sharePath":"[concat(parameters('dnsPrefix'),'-fsw')]",
+        "clusterName":"[concat(parameters('dnsPrefix'),'-fc')]",
         "adPDCVMName":"[concat(parameters('adVMPrefix'),'-pdc')]",
         "adBDCVMName":"[concat(parameters('adVMPrefix'),'-bdc')]",
         "sqlVMName":"[concat(parameters('sqlVMPrefix'),'-')]",
@@ -322,7 +330,7 @@
             "properties": {
                 "publicIPAllocationMethod": "[parameters('publicIPAddressType')]",
                 "dnsSettings": {
-                    "domainNameLabel": "[parameters('DNSPrefix')]"
+                    "domainNameLabel": "[parameters('dnsPrefix')]"
                 }
             }
         },
@@ -989,7 +997,6 @@
                         "LBAddress":"[reference(variables('sqlLBName')).privateIPAddress]",
                         "PrimaryReplica":"[concat(variables('sqlVMName'),'1')]",
                         "SecondaryReplica":"[concat(variables('sqlVMName'),'0')]",
-                        "DatabaseNames":"[concat(parameters('DNSPrefix-testdb'))]",
                         "AdminCreds":{
                             "UserName": "[parameters('adminUserName')]",
                             "Password": "PrivateSettingsRef:AdminPassword"
