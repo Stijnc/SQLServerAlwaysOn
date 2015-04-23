@@ -13,6 +13,9 @@ configuration CreateFailoverCluster
         [System.Management.Automation.PSCredential]$Admincreds,
 
         [Parameter(Mandatory)]
+        [System.Management.Automation.PSCredential]$SQLServiceCreds,
+
+        [Parameter(Mandatory)]
         [String]$ClusterName,
 
         [Parameter(Mandatory)]
@@ -30,13 +33,21 @@ configuration CreateFailoverCluster
         [UInt32]$SqlAlwaysOnAvailabilityGroupListenerPort,
 
         [Parameter(Mandatory)]
-        [String]$DomainNameFqdn,
+        [String]$LBName,
+
+        [Parameter(Mandatory)]
+        [String]$LBAddress,
 
         [Parameter(Mandatory)]
         [String]$PrimaryReplica,
 
         [Parameter(Mandatory)]
         [String]$SecondaryReplica,
+
+        [Parameter(Mandatory)]
+        [String]$SqlAlwaysOnEndpointName,
+
+        [UInt32]$DatabaseEnginePort = 1433,
 
         [String]$DomainNetbiosName=(Get-NetBIOSName -DomainName $DomainName),
 
@@ -46,9 +57,9 @@ configuration CreateFailoverCluster
 
     )
 
-    Import-DscResource -ModuleName xComputerManagement, xFailOverCluster,CDisk,xActiveDirectory,XDisk,xSqlPs
+    Import-DscResource -ModuleName xComputerManagement, xFailOverCluster,CDisk,xActiveDirectory,XDisk,xSqlPs,xNetworking, xSql, xSQLServer
     [System.Management.Automation.PSCredential]$DomainCreds = New-Object System.Management.Automation.PSCredential ("${DomainNetbiosName}\$($Admincreds.UserName)", $Admincreds.Password)
-    [System.Management.Automation.PSCredential]$SQLCreds = New-Object System.Management.Automation.PSCredential ("${DomainNetbiosName}\$($SqlServerServiceAccountcreds.UserName)", $SqlServerServiceAccountcreds.Password)
+    [System.Management.Automation.PSCredential]$SQLCreds = New-Object System.Management.Automation.PSCredential ("${DomainNetbiosName}\$($SQLServiceCreds.UserName)", $SQLServiceCreds.Password)
     
     WaitForSqlSetup
 
@@ -111,7 +122,101 @@ configuration CreateFailoverCluster
             DomainName = $DomainName
             Credential = $DomainCreds
         }
-          
+        
+        xFirewall DatabaseEngineFirewallRule
+        {
+            Direction = "Inbound"
+            Name = "SQL-Server-Database-Engine-TCP-In"
+            DisplayName = "SQL Server Database Engine (TCP-In)"
+            Description = "Inbound rule for SQL Server to allow TCP traffic for the Database Engine."
+            DisplayGroup = "SQL Server"
+            State = "Enabled"
+            Access = "Allow"
+            Protocol = "TCP"
+            LocalPort = $DatabaseEnginePort -as [String]
+            Ensure = "Present"
+        }
+
+        xFirewall DatabaseMirroringFirewallRule
+        {
+            Direction = "Inbound"
+            Name = "SQL-Server-Database-Mirroring-TCP-In"
+            DisplayName = "SQL Server Database Mirroring (TCP-In)"
+            Description = "Inbound rule for SQL Server to allow TCP traffic for the Database Mirroring."
+            DisplayGroup = "SQL Server"
+            State = "Enabled"
+            Access = "Allow"
+            Protocol = "TCP"
+            LocalPort = "5022"
+            Ensure = "Present"
+        }
+
+        xFirewall ListenerFirewallRule
+        {
+            Direction = "Inbound"
+            Name = "SQL-Server-Availability-Group-Listener-TCP-In"
+            DisplayName = "SQL Server Availability Group Listener (TCP-In)"
+            Description = "Inbound rule for SQL Server to allow TCP traffic for the Availability Group listener."
+            DisplayGroup = "SQL Server"
+            State = "Enabled"
+            Access = "Allow"
+            Protocol = "TCP"
+            LocalPort = "59999"
+            Ensure = "Present"
+        }
+
+          xSqlLogin AddDomainAdminAccountToSysadminServerRole
+        {
+            Name = $DomainCreds.UserName
+            LoginType = "WindowsUser"
+            ServerRoles = "sysadmin"
+            Enabled = $true
+            Credential = $Admincreds
+        }
+
+        xADUser CreateSqlServerServiceAccount
+        {
+            DomainAdministratorCredential = $DomainCreds
+            DomainName = $DomainName
+            UserName = $SQLServicecreds.UserName
+            Password = $SQLServicecreds
+            Ensure = "Present"
+            DependsOn = "[xSqlLogin]AddDomainAdminAccountToSysadminServerRole"
+        }
+
+        xSqlLogin AddSqlServerServiceAccountToSysadminServerRole
+        {
+            Name = $SQLCreds.UserName
+            LoginType = "WindowsUser"
+            ServerRoles = "sysadmin"
+            Enabled = $true
+            Credential = $Admincreds
+            DependsOn = "[xADUser]CreateSqlServerServiceAccount"
+        }
+
+        xSqlServer ConfigureSqlServerWithAlwaysOn
+        {
+            InstanceName = $env:COMPUTERNAME
+            SqlAdministratorCredential = $Admincreds
+            ServiceCredential = $SQLCreds
+            Hadr = "Enabled"
+            MaxDegreeOfParallelism = 1
+            FilePath = "F:\DATA"
+            LogPath = "G:\LOG"
+            DomainAdministratorCredential = $DomainCreds
+            DependsOn = "[xSqlLogin]AddSqlServerServiceAccountToSysadminServerRole"
+        }
+
+        xSqlEndpoint SqlAlwaysOnEndpoint
+        {
+            InstanceName = $env:COMPUTERNAME
+            Name = $SqlAlwaysOnEndpointName
+            PortNumber = 5022
+            AllowedUser = $SQLServiceCreds.UserName
+            SqlAdministratorCredential = $Domaincreds
+            DependsOn = "[xSqlServer]ConfigureSqlServerWithAlwaysOn"
+        }
+
         xCluster FailoverCluster
         {
             Name = $ClusterName
@@ -140,6 +245,18 @@ configuration CreateFailoverCluster
             DomainCredential =$DomainCreds
             SqlAdministratorCredential = $Admincreds
         }
+        WindowsFeature DNSPS
+        {
+            Name = "RSAT-DNS-Server"
+            Ensure = "Present"
+        } 
+        
+        Script UpdateDNS
+        {
+            SetScript = "Add-DnsServerResourceRecordA -Name $LBName -ZoneName $DomainName -IPv4Address $LBAddress -ErrorAction 'continue'"
+            TestScript = "Get-DnsServerResourceRecord -Name $LBName -ZoneName $DomainName -ErrorAction 'silentlycontinue'"
+            GetScript = "@{LBAddress=$LBAddress}"   
+        }
 
         xSqlAvailabilityGroupListener SqlAGListener
         {
@@ -154,13 +271,21 @@ configuration CreateFailoverCluster
             DependsOn = "[xSqlAvailabilityGroup]SqlAG"
         }
         
+        Script ConfigureDatabases
+        {
+            SetScript = "Configure-Databases -DatabaseNames $DatabaseNames -SqlAdministratorCredential $SQLCreds -PrimaryReplica $PrimaryReplica -SecondaryReplica $SecondaryReplica -SqlAlwaysOnAvailabilityGroupName $SqlAlwaysOnAvailabilityGroupName"
+            TestScript = "Test-Databases -DatabaseNames $DatabaseNames -SqlAdministratorCredential $SQLCreds -PrimaryReplica $PrimaryReplica -SecondaryReplica $SecondaryReplica -SqlAlwaysOnAvailabilityGroupName $SqlAlwaysOnAvailabilityGroupName"
+            GetScript = "@{DatabaseNames=$DatabaseNames}"   
+            DependsOn = "[xSqlAvailabilityGroupListener]SqlAGListener" 
+        }
+            
         LocalConfigurationManager 
         {
             ActionAfterReboot = 'StopConfiguration'
         }
     }
 
-    Create-Databases -DatabaseNames $DatabaseNames
+    
 }
 function Get-NetBIOSName
 { 
@@ -185,21 +310,69 @@ function Get-NetBIOSName
         }
     }
 }
-function Create-Databases
+function Test-Databases
 {
     param(
-        [String[]]$DatabaseNames
+        [String[]]$DatabaseNames,
+        [PSCredential]$SqlAdministratorCredential,
+        [string]$PrimaryReplica,
+        [string]$SecondaryReplica,
+        [string]$SqlAlwaysOnAvailabilityGroupName
     )
+
+    # Required SQL managability modules
+    [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.Smo") | Out-Null
+    [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.SmoExtended") | Out-Null
+    [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.ConnectionInfo") | Out-Null
+    
+    if ($null -ne $DatabaseNames) {
+        # Primamry Replica connection
+        $primaryServer = Get-SqlServer $PrimaryReplica -SqlAdministratorCredential $SqlAdministratorCredential
+        $replicaServer = Get-SqlServer $SecondaryReplica -SqlAdministratorCredential $SqlAdministratorCredential
+        $primaryAG = $primaryServer.AvailabilityGroups | where { $_.Name -eq $SqlAlwaysOnAvailabilityGroupName }
+        $secondaryAG = $replicaServer.AvailabilityGroups | where { $_.Name -eq $SqlAlwaysOnAvailabilityGroupName }
+
+        foreach ($database in $DatabaseNames)
+        {
+            if($null -ne $Server.Databases[$DatabaseName] ) {
+
+                if (($secondaryAG.AvailabilityDatabases | Where-Object { $_.Name -eq $database }).IsJoined) {
+                    continue
+                }
+                else {
+                    return $false
+                }
+                 
+            }
+            else {
+                return $false
+            }
+        } 
+    }
+
+    return $true
+}
+function Configure-Databases
+{
+    param(
+        [String[]]$DatabaseNames,
+        [PSCredential]$SqlAdministratorCredential,
+        [string]$PrimaryReplica,
+        [string]$SecondaryReplica,
+        [string]$SqlAlwaysOnAvailabilityGroupName
+
+
+    )
+    
     # Required SQL managability modules
     [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.Smo") | Out-Null
     [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.SmoExtended") | Out-Null
 
+
     #If there are databases specified, then we create them, backup them up and add them to the specified AG replicas
     if ($null -ne $DatabaseNames)
     {
-        # SysAdmin
-        $SqlAdministratorCredential = New-Object System.Management.Automation.PSCredential ("$DomainName\$DomainAdministratorUserName", $(ConvertTo-SecureString $DomainAdministratorPassword -AsPlainText -Force))
-
+        
         # Primamry Replica connection
         $primaryServer = Get-SqlServer $PrimaryReplica -SqlAdministratorCredential $SqlAdministratorCredential
 
