@@ -2,27 +2,27 @@
 # Copyright="© Microsoft Corporation. All rights reserved."
 #
 
-param
-(
-    [Parameter(Mandatory)]
-    [String]$DomainName,
-    
-    [Parameter(Mandatory)]
-    [System.Management.Automation.PSCredential]$Admincreds,
-
-    [Parameter(Mandatory)]
-    [System.Management.Automation.PSCredential]$SqlServerServiceAccountcreds,
-
-    [Parameter(Mandatory)]
-    [String]$SqlAlwaysOnEndpointName,
-    
-    [String]$DomainNetbiosName=(Get-NetBIOSName -DomainName $DomainName),
-    
-    [UInt32]$DatabaseEnginePort = 1433
-)
-
 configuration AvailabilityGroupNode
 {
+    param
+    (
+        [Parameter(Mandatory)]
+        [String]$DomainName,
+    
+        [Parameter(Mandatory)]
+        [System.Management.Automation.PSCredential]$Admincreds,
+
+        [Parameter(Mandatory)]
+        [System.Management.Automation.PSCredential]$SqlServerServiceAccountcreds,
+
+        [Parameter(Mandatory)]
+        [String]$SqlAlwaysOnEndpointName,
+    
+        [String]$DomainNetbiosName=(Get-NetBIOSName -DomainName $DomainName),
+    
+        [UInt32]$DatabaseEnginePort = 1433
+    )
+
     Import-DscResource -ModuleName xComputerManagement, xNetworking, xSqlPs, xActiveDirectory
 
     [System.Management.Automation.PSCredential]$DomainCreds = New-Object System.Management.Automation.PSCredential ("${DomainNetbiosName}\$($Admincreds.UserName)", $Admincreds.Password)

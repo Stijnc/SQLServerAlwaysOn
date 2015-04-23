@@ -914,6 +914,7 @@
                             "UserName": "[parameters('adminUserName')]",
                             "Password": "PrivateSettingsRef:AdminPassword"
                         }
+
                     }
                 },
                 "protectedSettings": {
@@ -973,6 +974,7 @@
                     "ConfigurationFunction": "[variables('sqlAOPrepareConfigurationFunction')]",
                     "Properties": {
                         "DomainName": "[parameters('domainName')]",
+
                         "AdminCreds":{
                             "UserName": "[parameters('adminUserName')]",
                             "Password": "PrivateSettingsRef:AdminPassword"
@@ -1009,7 +1011,7 @@
                         "DomainName": "[parameters('domainName')]",
                         "ClusterName":"[variables('clusterName')]",
                         "SharePath":"[concat('\\\\',variables('sqlwVMName'),variables('\\sharePath'))]",
-                        "Nodes":"[concat('\"'variables('sqlVMName'),'0\",\"',variables('sqlVMName'),'1\"']",
+                        "Nodes":"[concat('\"',variables('sqlVMName'),'0\",\"',variables('sqlVMName'),'1\"')]",
                         "AdminCreds":{
                             "UserName": "[parameters('adminUserName')]",
                             "Password": "PrivateSettingsRef:AdminPassword"

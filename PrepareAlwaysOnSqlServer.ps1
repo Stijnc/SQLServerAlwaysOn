@@ -2,21 +2,20 @@
 # Copyright="© Microsoft Corporation. All rights reserved."
 #
 
-param
-(
-    [Parameter(Mandatory)]
-    [String]$DomainName,
-
-    [Parameter(Mandatory)]
-    [System.Management.Automation.PSCredential]$Admincreds,
-
-    [Int]$RetryCount=20,
-    [Int]$RetryIntervalSec=30
-)
-
-
 configuration PrepareAlwaysOnSqlServer
 {
+    param
+    (
+        [Parameter(Mandatory)]
+        [String]$DomainName,
+
+        [Parameter(Mandatory)]
+        [System.Management.Automation.PSCredential]$Admincreds,
+
+        [Int]$RetryCount=20,
+        [Int]$RetryIntervalSec=30
+    )
+
     Import-DscResource -ModuleName xComputerManagement,CDisk,xActiveDirectory,XDisk
     [System.Management.Automation.PSCredential ]$DomainCreds = New-Object System.Management.Automation.PSCredential ("${DomainName}\$($Admincreds.UserName)", $Admincreds.Password)
 

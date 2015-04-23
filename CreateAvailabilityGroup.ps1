@@ -2,43 +2,43 @@
 # Copyright="© Microsoft Corporation. All rights reserved."
 #
 
-param
-(
-    [Parameter(Mandatory)]
-    [String]$DomainName,
 
-    [Parameter(Mandatory)]
-    [System.Management.Automation.PSCredential]$Admincreds,
-
-    [Parameter(Mandatory)]
-    [String]$SqlAlwaysOnAvailabilityGroupName,
-
-    [Parameter(Mandatory)]
-    [String]$SqlAlwaysOnAvailabilityGroupListenerName,
-
-    [UInt32]$SqlAlwaysOnAvailabilityGroupListenerPort,
-
-    [Parameter(Mandatory)]
-    [String]$ClusterName,
-
-    [Parameter(Mandatory)]
-    [String]$DomainNameFqdn,
-
-    [Parameter(Mandatory)]
-    [String]$PrimaryReplica,
-
-    [Parameter(Mandatory)]
-    [String]$SecondaryReplica,
-
-    [String]$DomainNetbiosName=(Get-NetBIOSName -DomainName $DomainName),
-
-    [String[]]$DatabaseNames
-)
-
-. "$PSScriptRoot\CreateAvailabilityGroupCommon.ps1"
 
 configuration AvailabilityGroup
 {
+    param
+    (
+        [Parameter(Mandatory)]
+        [String]$DomainName,
+
+        [Parameter(Mandatory)]
+        [System.Management.Automation.PSCredential]$Admincreds,
+
+        [Parameter(Mandatory)]
+        [String]$SqlAlwaysOnAvailabilityGroupName,
+
+        [Parameter(Mandatory)]
+        [String]$SqlAlwaysOnAvailabilityGroupListenerName,
+
+        [UInt32]$SqlAlwaysOnAvailabilityGroupListenerPort,
+
+        [Parameter(Mandatory)]
+        [String]$ClusterName,
+
+        [Parameter(Mandatory)]
+        [String]$DomainNameFqdn,
+
+        [Parameter(Mandatory)]
+        [String]$PrimaryReplica,
+
+        [Parameter(Mandatory)]
+        [String]$SecondaryReplica,
+
+        [String]$DomainNetbiosName=(Get-NetBIOSName -DomainName $DomainName),
+
+        [String[]]$DatabaseNames
+    )
+
     Import-DscResource -ModuleName xSqlPs
 
     [System.Management.Automation.PSCredential]$DomainCreds = New-Object System.Management.Automation.PSCredential ("${DomainNetbiosName}\$($Admincreds.UserName)", $Admincreds.Password)
@@ -72,36 +72,8 @@ configuration AvailabilityGroup
             }
         }
 
-        #If there are databases specified, then we create them, backup them up and add them to the specified AG replicas
+        create-Databases -DatabaseNames $DatabaseNames
 
-        if ($null -ne $DatabaseNames)
-        {
-            # Required SQL managability modules
-            [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.Smo") | Out-Null
-            [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.SmoExtended") | Out-Null
-
-            # SysAdmin
-            $SqlAdministratorCredential = New-Object System.Management.Automation.PSCredential ("$DomainName\$DomainAdministratorUserName", $(ConvertTo-SecureString $DomainAdministratorPassword -AsPlainText -Force))
-
-            # Primamry Replica connection
-            $primaryServer = Get-SqlServer $PrimaryReplica -SqlAdministratorCredential $SqlAdministratorCredential
-
-            #create database on the primary, then add them to all replicas and sync them
-            foreach ($database in $DatabaseNames)
-            {
-                Write-Verbose -Message "Creating sample database '$($database)' ..."
-                Create-SqlAlwaysOnDatabase -DatabaseName $database -Server $primaryServer
-
-                #synchronize existing availability group replicas
-                Update-SqlAlwaysOnAvailabilityGroupDatabases -SqlAlwaysOnAvailabilityGroupName $SqlAlwaysOnAvailabilityGroupName -PrimaryReplica $PrimaryReplica -SecondaryReplica $SecondaryReplica -SqlAdministratorCredential $SqlAdministratorCredential
-            }
-
-            Write-Verbose -Message "Adding databases Availability Group '$SqlAlwaysOnAvailabilityGroupName' completed."
-        }
-        else
-        {
-            Write-Verbose -Message "No databases were specified to add to Availability Group '$SqlAlwaysOnAvailabilityGroupName'."
-        }
         LocalConfigurationManager 
         {
             ActionAfterReboot = 'StopConfiguration'
@@ -110,35 +82,40 @@ configuration AvailabilityGroup
     }
 }
 
-
-# Required SQL managability modules
-[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.Smo") | Out-Null
-[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.SmoExtended") | Out-Null
-
-#If there are databases specified, then we create them, backup them up and add them to the specified AG replicas
-if ($null -ne $DatabaseNames)
+function Create-Databases
 {
-    # SysAdmin
-    $SqlAdministratorCredential = New-Object System.Management.Automation.PSCredential ("$DomainName\$DomainAdministratorUserName", $(ConvertTo-SecureString $DomainAdministratorPassword -AsPlainText -Force))
+    param(
+        [String[]]$DatabaseNames
+    )
+    # Required SQL managability modules
+    [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.Smo") | Out-Null
+    [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.SmoExtended") | Out-Null
 
-    # Primamry Replica connection
-    $primaryServer = Get-SqlServer $PrimaryReplica -SqlAdministratorCredential $SqlAdministratorCredential
-
-    #create database on the primary, then add them to all replicas and sync them
-    foreach ($database in $DatabaseNames)
+    #If there are databases specified, then we create them, backup them up and add them to the specified AG replicas
+    if ($null -ne $DatabaseNames)
     {
-        Write-Verbose -Message "Creating sample database '$($database)' ..."
-        Create-SqlAlwaysOnDatabase -DatabaseName $database -Server $primaryServer
+        # SysAdmin
+        $SqlAdministratorCredential = New-Object System.Management.Automation.PSCredential ("$DomainName\$DomainAdministratorUserName", $(ConvertTo-SecureString $DomainAdministratorPassword -AsPlainText -Force))
 
-        #synchronize existing availability group replicas
-        Update-SqlAlwaysOnAvailabilityGroupDatabases -SqlAlwaysOnAvailabilityGroupName $SqlAlwaysOnAvailabilityGroupName -PrimaryReplica $PrimaryReplica -SecondaryReplica $SecondaryReplica -SqlAdministratorCredential $SqlAdministratorCredential
+        # Primamry Replica connection
+        $primaryServer = Get-SqlServer $PrimaryReplica -SqlAdministratorCredential $SqlAdministratorCredential
+
+        #create database on the primary, then add them to all replicas and sync them
+        foreach ($database in $DatabaseNames)
+        {
+            Write-Verbose -Message "Creating sample database '$($database)' ..."
+            Create-SqlAlwaysOnDatabase -DatabaseName $database -Server $primaryServer
+
+            #synchronize existing availability group replicas
+            Update-SqlAlwaysOnAvailabilityGroupDatabases -SqlAlwaysOnAvailabilityGroupName $SqlAlwaysOnAvailabilityGroupName -PrimaryReplica $PrimaryReplica -SecondaryReplica $SecondaryReplica -SqlAdministratorCredential $SqlAdministratorCredential
+        }
+
+        Write-Verbose -Message "Adding databases Availability Group '$SqlAlwaysOnAvailabilityGroupName' completed."
     }
-
-    Write-Verbose -Message "Adding databases Availability Group '$SqlAlwaysOnAvailabilityGroupName' completed."
-}
-else
-{
-    Write-Verbose -Message "No databases were specified to add to Availability Group '$SqlAlwaysOnAvailabilityGroupName'."
+    else
+    {
+        Write-Verbose -Message "No databases were specified to add to Availability Group '$SqlAlwaysOnAvailabilityGroupName'."
+    }
 }
 
 function Update-SqlAlwaysOnAvailabilityGroupDatabases([String]$SqlAlwaysOnAvailabilityGroupName, [String]$PrimaryReplica, [String]$SecondaryReplica, [PSCredential]$SqlAdministratorCredential)

@@ -2,23 +2,23 @@
 # Copyright="© Microsoft Corporation. All rights reserved."
 #
 
-param
-(
-    [Parameter(Mandatory)]
-    [String]$DomainName,
-
-    [Parameter(Mandatory)]
-    [System.Management.Automation.PSCredential]$Admincreds,
-
-    [Parameter(Mandatory)]
-    [String]$SharePath,
-
-    [Int]$RetryCount=20,
-    [Int]$RetryIntervalSec=30
-)
-
 configuration CreateFileShareWitness
 {
+    param
+    (
+        [Parameter(Mandatory)]
+        [String]$DomainName,
+
+        [Parameter(Mandatory)]
+        [System.Management.Automation.PSCredential]$Admincreds,
+
+        [Parameter(Mandatory)]
+        [String]$SharePath,
+
+        [Int]$RetryCount=20,
+        [Int]$RetryIntervalSec=30
+    )
+
     Import-DscResource -ModuleName xComputerManagement, xSmbShare, cDisk,xDisk,xActiveDirectory
     
     Node localhost

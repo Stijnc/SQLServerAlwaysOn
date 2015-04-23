@@ -2,28 +2,28 @@
 # Copyright="© Microsoft Corporation. All rights reserved."
 #
 
-param
-(
-    [Parameter(Mandatory)]
-    [String]$DomainName,
-
-    [Parameter(Mandatory)]
-    [System.Management.Automation.PSCredential]$Admincreds,
-
-    [Parameter(Mandatory)]
-    [String]$ClusterName,
-
-    [Parameter(Mandatory)]
-    [String]$SharePath,
-
-    [String[]]$Nodes,
-    [Int]$RetryCount=20,
-    [Int]$RetryIntervalSec=30
-
-)
-
 configuration CreateFailoverCluster
 {
+    param
+    (
+        [Parameter(Mandatory)]
+        [String]$DomainName,
+
+        [Parameter(Mandatory)]
+        [System.Management.Automation.PSCredential]$Admincreds,
+
+        [Parameter(Mandatory)]
+        [String]$ClusterName,
+
+        [Parameter(Mandatory)]
+        [String]$SharePath,
+
+        [String[]]$Nodes,
+        [Int]$RetryCount=20,
+        [Int]$RetryIntervalSec=30
+
+    )
+
     Import-DscResource -ModuleName xComputerManagement, xFailOverCluster
     [System.Management.Automation.PSCredential ]$DomainCreds = New-Object System.Management.Automation.PSCredential ("${DomainName}\$($Admincreds.UserName)", $Admincreds.Password)
    
