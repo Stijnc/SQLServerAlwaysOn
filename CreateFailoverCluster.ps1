@@ -122,7 +122,26 @@ configuration CreateFailoverCluster
             DomainName = $DomainName
             Credential = $DomainCreds
         }
-        
+        xCluster FailoverCluster
+        {
+            Name = $ClusterName
+            DomainAdministratorCredential = $DomainCreds
+            Nodes = $Nodes
+        }
+
+        xWaitForFileShareWitness WaitForFSW
+        {
+            SharePath = $SharePath
+            DomainAdministratorCredential = $DomainCreds
+        }
+
+        xClusterQuorum FailoverClusterQuorum
+        {
+            Name = $ClusterName
+            SharePath = $SharePath
+            DomainAdministratorCredential = $DomainCreds
+        }
+
         xFirewall DatabaseEngineFirewallRule
         {
             Direction = "Inbound"
@@ -165,7 +184,7 @@ configuration CreateFailoverCluster
             Ensure = "Present"
         }
 
-          xSqlLogin AddDomainAdminAccountToSysadminServerRole
+        xSqlLogin AddDomainAdminAccountToSysadminServerRole
         {
             Name = $DomainCreds.UserName
             LoginType = "WindowsUser"
@@ -217,25 +236,22 @@ configuration CreateFailoverCluster
             DependsOn = "[xSqlServer]ConfigureSqlServerWithAlwaysOn"
         }
 
-        xCluster FailoverCluster
+        xSqlServer ConfigureSqlServerSecondaryWithAlwaysOn
         {
-            Name = $ClusterName
-            DomainAdministratorCredential = $DomainCreds
-            Nodes = $Nodes
+            InstanceName = $SecondaryReplica
+            SqlAdministratorCredential = $Admincreds
+            Hadr = "Enabled"
         }
 
-        xWaitForFileShareWitness WaitForFSW
+        xSqlEndpoint SqlSecondaryAlwaysOnEndpoint
         {
-            SharePath = $SharePath
-            DomainAdministratorCredential = $DomainCreds
+            InstanceName = $SecondaryReplica
+            Name = $SqlAlwaysOnEndpointName
+            PortNumber = 5022
+            AllowedUser = $SQLServiceCreds.UserName
+            SqlAdministratorCredential = $Domaincreds
         }
-
-        xClusterQuorum FailoverClusterQuorum
-        {
-            Name = $ClusterName
-            SharePath = $SharePath
-            DomainAdministratorCredential = $DomainCreds
-        }
+        
         xSqlAvailabilityGroup SqlAG
         {
             Name = $SqlAlwaysOnAvailabilityGroupName

@@ -271,8 +271,6 @@
         "sqllbProbeID":"[concat(variables('sqllbID'),'/probes/',variables('SQLAOProbe'))]",
         "sqlRDPNATRuleID":"[concat(variables('sqllbID'),'/inboundNatRules/',variables('RDPNAT'))]",
         "sqlBEAddressPoolID":"[concat(variables('sqllbID'),'/backendAddressPools/',variables('LBBE'))]",
-        "adPDCDataDisk":"ADPDCDataDisk",
-        "adBDCDataDisk":"ADBDCDataDisk",
         "adDataDiskSize":1000,
         "sqlDataDiskSize":1000,
         "sqlLogDiskSize":1000,
@@ -599,7 +597,7 @@
                     "dataDisks": [
                         {
                             "vhd": {
-                                "uri":"[concat('http://',parameters('newStorageAccountName'),'.blob.core.windows.net/',parameters('vmContainerName'),'/', variables('adPDCDataDisk'),'-1.vhd')]"
+                                "uri":"[concat('http://',parameters('newStorageAccountName'),'.blob.core.windows.net/',parameters('vmContainerName'),'/', variables('adPDCVMName'),'data-1.vhd')]"
                                 },
                             "name":"[concat(variables('adPDCVMName'),'-data-disk1')]",
                             "caching" : "None",
@@ -705,7 +703,7 @@
                     "dataDisks": [
                         {
                             "vhd": {
-                                "uri":"[concat('http://',parameters('newStorageAccountName'),'.blob.core.windows.net/',parameters('vmContainerName'),'/', variables('adBDCDataDisk'),'-1.vhd')]"
+                                "uri":"[concat('http://',parameters('newStorageAccountName'),'.blob.core.windows.net/',parameters('vmContainerName'),'/', variables('adBDCVMName'),'data-1.vhd')]"
                                 },
                             "name":"[concat(variables('adBDCVMName'),'-data-disk1')]",
                             "caching" : "None",

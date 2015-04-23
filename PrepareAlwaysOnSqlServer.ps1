@@ -166,7 +166,6 @@ configuration PrepareAlwaysOnSqlServer
             InstanceName = $env:COMPUTERNAME
             SqlAdministratorCredential = $Admincreds
             ServiceCredential = $SQLCreds
-            Hadr = "Enabled"
             MaxDegreeOfParallelism = 1
             FilePath = "F:\DATA"
             LogPath = "G:\LOG"
@@ -174,15 +173,6 @@ configuration PrepareAlwaysOnSqlServer
             DependsOn = "[xSqlLogin]AddSqlServerServiceAccountToSysadminServerRole"
         }
 
-        xSqlEndpoint SqlAlwaysOnEndpoint
-        {
-            InstanceName = $env:COMPUTERNAME
-            Name = $SqlAlwaysOnEndpointName
-            PortNumber = 5022
-            AllowedUser = $SQLCreds.UserName
-            SqlAdministratorCredential = $DomainCreds
-            DependsOn = "[xSqlServer]ConfigureSqlServerWithAlwaysOn"
-        }
         LocalConfigurationManager 
         {
             ActionAfterReboot = 'StopConfiguration'
