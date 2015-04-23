@@ -242,6 +242,9 @@
         "SQLAOProbe":"SQLAlwaysOnEndPointProbe",
         "staticSubnetName": "staticSubnet",
         "sqlSubnetName": "sqlSubnet",
+        "sqlAOEPName":"[concat(parameters('DNSPrefix'),'-hadr')]",
+        "sharePath":"[concat(parameters('DNSPrefix'),'-fsw')]",
+        "clusterName":"[concat(parameters('DNSPrefix'),'-fc')]",
         "adPDCVMName":"[concat(parameters('adVMPrefix'),'-pdc')]",
         "adBDCVMName":"[concat(parameters('adVMPrefix'),'-bdc')]",
         "sqlVMName":"[concat(parameters('sqlVMPrefix'),'-')]",
@@ -292,7 +295,6 @@
             }
         ],
         "vnetwithDNSTemplateUri":"[concat(parameters('AssetLocation'),'/vnet-with-dns-server.json')]",
-        "sharePath":"WitnessShare",
         "adPDCModulesURL":"[concat(parameters('AssetLocation'),'/CreateADPDC.ps1.zip')]",
         "adPDCConfigurationFunction":"CreateADPDC.ps1\\CreateADPDC",
         "adBDCModulesURL":"[concat(parameters('AssetLocation'),'/CreateADBDC.ps1.zip')]",
@@ -300,9 +302,9 @@
         "fswModulesURL":"[concat(parameters('AssetLocation'),'/CreateFileShareWitness.ps1.zip')]",
         "fswConfigurationFunction":"CreateFileShareWitness.ps1\\CreateFileShareWitness",
         "sqlAOPrepareModulesURL":"[concat(parameters('AssetLocation'),'/PrepareAlwaysOnSqlServer.ps1.zip')]",
-        "sqlAOPrepareConfigurationFunction":"PrepareAlwaysOnSqlServer.ps1\\PrepareAlwaysOnSqlServer"
-
-
+        "sqlAOPrepareConfigurationFunction":"PrepareAlwaysOnSqlServer.ps1\\PrepareAlwaysOnSqlServer",
+        "createClusterModulesURL":"[concat(parameters('AssetLocation'),'/CreateFailoverCluster.ps1.zip')]",
+        "createClusterConfigurationFunction":"CreateFailoverCluster.ps1\\CreateFailoverCluster"
     },
     "resources": [
         {
@@ -927,7 +929,7 @@
             "apiVersion": "2014-12-01-preview",
             "location": "[parameters('deploymentLocation')]",
             "dependsOn":[
-                "[concat('Microsoft.Compute/virtualMachines/', variables('sqlVMName'),'0)]",
+                "[concat('Microsoft.Compute/virtualMachines/', variables('sqlVMName'),'0')]",
                 "[concat('Microsoft.Compute/virtualMachines/',variables('sqlwVMName'),'/extensions/CreateFileShareWitness')]"
 
             ],
@@ -959,9 +961,8 @@
             "apiVersion": "2014-12-01-preview",
             "location": "[parameters('deploymentLocation')]",
             "dependsOn":[
-                "[concat('Microsoft.Compute/virtualMachines/', variables('sqlVMName'),'1)]",
-                "[concat('Microsoft.Compute/virtualMachines/',variables('sqlwVMName'),'/extensions/CreateFileShareWitness')]"
-
+                "[concat('Microsoft.Compute/virtualMachines/', variables('sqlVMName'),'1')]",
+                "[concat('Microsoft.Compute/virtualMachines/',variables('sqlVMName'),'0/extensions/sqlAOPrepare')]"
             ],
             "properties": {
                 "publisher": "Microsoft.Powershell",
@@ -972,6 +973,43 @@
                     "ConfigurationFunction": "[variables('sqlAOPrepareConfigurationFunction')]",
                     "Properties": {
                         "DomainName": "[parameters('domainName')]",
+                        "AdminCreds":{
+                            "UserName": "[parameters('adminUserName')]",
+                            "Password": "PrivateSettingsRef:AdminPassword"
+                        }
+                    }
+                },
+                "protectedSettings": {
+                    "Items": {
+                        "AdminPassword": "[parameters('adminPassword')]"
+                    }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "name": "[concat(variables('sqlVMName'),'0/CreateCluster')]",
+            "apiVersion": "2014-12-01-preview",
+            "location": "[parameters('deploymentLocation')]",
+            "dependsOn":[
+                "[concat('Microsoft.Compute/virtualMachines/', variables('sqlVMName'),'0')]",
+                "[concat('Microsoft.Compute/virtualMachines/',variables('sqlVMName'),'0/extensions/sqlAOPrepare')]",
+                "[concat('Microsoft.Compute/virtualMachines/',variables('sqlVMName'),'1/extensions/sqlAOPrepare')]",
+                "[concat('Microsoft.Compute/virtualMachines/',variables('sqlwVMName'),'/extensions/CreateFileShareWitness')]"
+
+            ],
+            "properties": {
+                "publisher": "Microsoft.Powershell",
+                "type": "DSC",
+                "typeHandlerVersion": "1.7",
+                "settings": {
+                    "ModulesUrl": "[variables('createClusterModulesURL')]",
+                    "ConfigurationFunction": "[variables('createClusterConfigurationFunction')]",
+                    "Properties": {
+                        "DomainName": "[parameters('domainName')]",
+                        "ClusterName":"[variables('clusterName')]",
+                        "SharePath":"[concat('\\\\',variables('sqlwVMName'),variables('\\sharePath'))]",
+                        "Nodes":"[concat('\"'variables('sqlVMName'),'0\",\"',variables('sqlVMName'),'1\"']",
                         "AdminCreds":{
                             "UserName": "[parameters('adminUserName')]",
                             "Password": "PrivateSettingsRef:AdminPassword"

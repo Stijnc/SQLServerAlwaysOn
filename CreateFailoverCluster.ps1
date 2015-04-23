@@ -22,7 +22,7 @@ param
 
 )
 
-configuration FailoverCluster
+configuration CreateFailoverCluster
 {
     Import-DscResource -ModuleName xComputerManagement, xFailOverCluster
     [System.Management.Automation.PSCredential ]$DomainCreds = New-Object System.Management.Automation.PSCredential ("${DomainName}\$($Admincreds.UserName)", $Admincreds.Password)
@@ -41,33 +41,17 @@ configuration FailoverCluster
             Ensure = "Present"
         }
      
-        xWaitForADDomain DscForestWait 
-        { 
-            DomainName = $DomainName 
-            DomainUserCredential= $DomainCreds
-            RetryCount = $RetryCount 
-            RetryIntervalSec = $RetryIntervalSec 
-        }
-        xComputer DomainJoin
-        {
-            Name = $env:COMPUTERNAME
-            DomainName = $DomainName
-            Credential = $DomainCreds
-        }
-
         xCluster FailoverCluster
         {
             Name = $ClusterName
             DomainAdministratorCredential = $DomainCreds
             Nodes = $Nodes
-            DependsOn = "[xComputer]DomainJoin"
         }
 
         xWaitForFileShareWitness WaitForFSW
         {
             SharePath = $SharePath
             DomainAdministratorCredential = $DomainCreds
-            DependsOn = "[xCluster]FailoverCluster"
         }
 
         xClusterQuorum FailoverClusterQuorum
@@ -75,7 +59,6 @@ configuration FailoverCluster
             Name = $ClusterName
             SharePath = $SharePath
             DomainAdministratorCredential = $DomainCreds
-            DependsOn = "[xWaitForFileShareWitness]WaitForFSW"
         }
         LocalConfigurationManager 
         {

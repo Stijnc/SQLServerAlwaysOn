@@ -19,7 +19,7 @@ param
 
 configuration CreateFileShareWitness
 {
-    Import-DscResource -ModuleName xComputerManagement, xSmbShare, cDisk,xDisk
+    Import-DscResource -ModuleName xComputerManagement, xSmbShare, cDisk,xDisk,xActiveDirectory
     
     Node localhost
     {
@@ -35,6 +35,12 @@ configuration CreateFileShareWitness
             DiskNumber = 2
             DriveLetter = "F"
         }
+
+        WindowsFeature ADPS
+        {
+            Name = "RSAT-AD-PowerShell"
+            Ensure = "Present"
+        } 
 
         xComputer DomainJoin
         {
