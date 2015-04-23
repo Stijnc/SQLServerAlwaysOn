@@ -926,11 +926,11 @@
         },
         {
             "type": "Microsoft.Compute/virtualMachines/extensions",
-            "name": "[concat(variables('sqlVMName'),'0/sqlAOPrepare')]",
+            "name": "[concat(variables('sqlVMName'),'1/sqlAOPrepare')]",
             "apiVersion": "2014-12-01-preview",
             "location": "[parameters('deploymentLocation')]",
             "dependsOn":[
-                "[concat('Microsoft.Compute/virtualMachines/', variables('sqlVMName'),'0')]",
+                "[concat('Microsoft.Compute/virtualMachines/', variables('sqlVMName'),'1')]",
                 "[concat('Microsoft.Compute/virtualMachines/',variables('sqlwVMName'),'/extensions/CreateFileShareWitness')]"
 
             ],
@@ -958,12 +958,11 @@
         },
         {
             "type": "Microsoft.Compute/virtualMachines/extensions",
-            "name": "[concat(variables('sqlVMName'),'1/CreateCluster')]",
+            "name": "[concat(variables('sqlVMName'),'0/CreateCluster')]",
             "apiVersion": "2014-12-01-preview",
             "location": "[parameters('deploymentLocation')]",
             "dependsOn":[
                 "[concat('Microsoft.Compute/virtualMachines/', variables('sqlVMName'),'0')]",
-                "[concat('Microsoft.Compute/virtualMachines/',variables('sqlVMName'),'0/extensions/sqlAOPrepare')]",
                 "[concat('Microsoft.Compute/virtualMachines/',variables('sqlVMName'),'1/extensions/sqlAOPrepare')]",
                 "[concat('Microsoft.Compute/virtualMachines/',variables('sqlwVMName'),'/extensions/CreateFileShareWitness')]"
 

@@ -12,12 +12,23 @@ configuration PrepareAlwaysOnSqlServer
         [Parameter(Mandatory)]
         [System.Management.Automation.PSCredential]$Admincreds,
 
+        [Parameter(Mandatory)]
+        [System.Management.Automation.PSCredential]$SQLServicecreds,
+
+        [Parameter(Mandatory)]
+        [String]$SqlAlwaysOnEndpointName,
+
+        [UInt32]$DatabaseEnginePort = 1433,
+
+        [String]$DomainNetbiosName=(Get-NetBIOSName -DomainName $DomainName),
+
         [Int]$RetryCount=20,
         [Int]$RetryIntervalSec=30
     )
 
-    Import-DscResource -ModuleName xComputerManagement,CDisk,xActiveDirectory,XDisk
-    [System.Management.Automation.PSCredential ]$DomainCreds = New-Object System.Management.Automation.PSCredential ("${DomainName}\$($Admincreds.UserName)", $Admincreds.Password)
+    Import-DscResource -ModuleName xComputerManagement,CDisk,xActiveDirectory,XDisk,xSql, xSQLServer, xSQLps,xNetworking
+    [System.Management.Automation.PSCredential]$DomainCreds = New-Object System.Management.Automation.PSCredential ("${DomainNetbiosName}\$($Admincreds.UserName)", $Admincreds.Password)
+    [System.Management.Automation.PSCredential]$SQLCreds = New-Object System.Management.Automation.PSCredential ("${DomainNetbiosName}\$($SqlServerServiceAccountcreds.UserName)", $SqlServerServiceAccountcreds.Password)
 
     WaitForSqlSetup
 
@@ -79,6 +90,99 @@ configuration PrepareAlwaysOnSqlServer
             DomainName = $DomainName
             Credential = $DomainCreds
         }
+        xFirewall DatabaseEngineFirewallRule
+        {
+            Direction = "Inbound"
+            Name = "SQL-Server-Database-Engine-TCP-In"
+            DisplayName = "SQL Server Database Engine (TCP-In)"
+            Description = "Inbound rule for SQL Server to allow TCP traffic for the Database Engine."
+            DisplayGroup = "SQL Server"
+            State = "Enabled"
+            Access = "Allow"
+            Protocol = "TCP"
+            LocalPort = $DatabaseEnginePort -as [String]
+            Ensure = "Present"
+        }
+
+        xFirewall DatabaseMirroringFirewallRule
+        {
+            Direction = "Inbound"
+            Name = "SQL-Server-Database-Mirroring-TCP-In"
+            DisplayName = "SQL Server Database Mirroring (TCP-In)"
+            Description = "Inbound rule for SQL Server to allow TCP traffic for the Database Mirroring."
+            DisplayGroup = "SQL Server"
+            State = "Enabled"
+            Access = "Allow"
+            Protocol = "TCP"
+            LocalPort = "5022"
+            Ensure = "Present"
+        }
+
+        xFirewall ListenerFirewallRule
+        {
+            Direction = "Inbound"
+            Name = "SQL-Server-Availability-Group-Listener-TCP-In"
+            DisplayName = "SQL Server Availability Group Listener (TCP-In)"
+            Description = "Inbound rule for SQL Server to allow TCP traffic for the Availability Group listener."
+            DisplayGroup = "SQL Server"
+            State = "Enabled"
+            Access = "Allow"
+            Protocol = "TCP"
+            LocalPort = "59999"
+            Ensure = "Present"
+        }
+
+        xSqlLogin AddDomainAdminAccountToSysadminServerRole
+        {
+            Name = $DomainCreds.UserName
+            LoginType = "WindowsUser"
+            ServerRoles = "sysadmin"
+            Enabled = $true
+            Credential = $Admincreds
+        }
+
+        xADUser CreateSqlServerServiceAccount
+        {
+            DomainAdministratorCredential = $DomainCreds
+            DomainName = $DomainName
+            UserName = $SQLServicecreds.UserName
+            Password = $SQLServicecreds
+            Ensure = "Present"
+            DependsOn = "[xSqlLogin]AddDomainAdminAccountToSysadminServerRole"
+        }
+
+        xSqlLogin AddSqlServerServiceAccountToSysadminServerRole
+        {
+            Name = $SQLCreds.UserName
+            LoginType = "WindowsUser"
+            ServerRoles = "sysadmin"
+            Enabled = $true
+            Credential = $Admincreds
+            DependsOn = "[xADUser]CreateSqlServerServiceAccount"
+        }
+
+        xSqlServer ConfigureSqlServerWithAlwaysOn
+        {
+            InstanceName = $env:COMPUTERNAME
+            SqlAdministratorCredential = $Admincreds
+            ServiceCredential = $SQLCreds
+            Hadr = "Enabled"
+            MaxDegreeOfParallelism = 1
+            FilePath = "F:\DATA"
+            LogPath = "G:\LOG"
+            DomainAdministratorCredential = $DomainCreds
+            DependsOn = "[xSqlLogin]AddSqlServerServiceAccountToSysadminServerRole"
+        }
+
+        xSqlEndpoint SqlAlwaysOnEndpoint
+        {
+            InstanceName = $env:COMPUTERNAME
+            Name = $SqlAlwaysOnEndpointName
+            PortNumber = 5022
+            AllowedUser = $SQLCreds.UserName
+            SqlAdministratorCredential = $DomainCreds
+            DependsOn = "[xSqlServer]ConfigureSqlServerWithAlwaysOn"
+        }
         LocalConfigurationManager 
         {
             ActionAfterReboot = 'StopConfiguration'
@@ -86,7 +190,29 @@ configuration PrepareAlwaysOnSqlServer
 
     }
 }
+function Get-NetBIOSName
+{ 
+    [OutputType([string])]
+    param(
+        [string]$DomainName
+    )
 
+    if ($DomainName.Contains('.')) {
+        $length=$DomainName.IndexOf('.')
+        if ( $length -ge 16) {
+            $length=15
+        }
+        return $DomainName.Substring(0,$length)
+    }
+    else {
+        if ($DomainName.Length -gt 15) {
+            return $DomainName.Substring(0,15)
+        }
+        else {
+            return $DomainName
+        }
+    }
+}
 function WaitForSqlSetup
 {
     # Wait for SQL Server Setup to finish before proceeding.
