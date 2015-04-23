@@ -997,6 +997,7 @@
                         "LBAddress":"[reference(variables('sqlLBName')).privateIPAddress]",
                         "PrimaryReplica":"[concat(variables('sqlVMName'),'1')]",
                         "SecondaryReplica":"[concat(variables('sqlVMName'),'0')]",
+                        "DatabaseNames":"[parameters('databaseNames')]",
                         "AdminCreds":{
                             "UserName": "[parameters('adminUserName')]",
                             "Password": "PrivateSettingsRef:AdminPassword"
