@@ -181,7 +181,7 @@
         "witnessImageName": {
             "type": "string",
             "metadata": {
-                "Description": "The name of the VM Image to create the SP VM from"
+                "Description": "The name of the VM Image to create the Witness VM from"
             },
             "defaultValue": "a699494373c04fc0bc8f2bb1389d6106__Windows-Server-2012-R2-201503.01-en.us-127GB.vhd"
         },
@@ -251,6 +251,8 @@
         "staticSubnetName": "staticSubnet",
         "sqlSubnetName": "sqlSubnet",
         "sqlAOEPName":"[concat(parameters('dnsPrefix'),'-hadr')]",
+        "sqlAOAGName":"[concat(parameters('dnsPrefix'),'-ag')]",
+        "sqlAOListenerName":"[concat(parameters('dnsPrefix'),'ag-listener')]",
         "sharePath":"[concat(parameters('dnsPrefix'),'-fsw')]",
         "clusterName":"[concat(parameters('dnsPrefix'),'-fc')]",
         "adPDCVMName":"[concat(parameters('adVMPrefix'),'-pdc')]",
@@ -270,14 +272,13 @@
         "sqlLBName" : "sqlLoadBalancer",
         "publicLBName" : "publicLoadBalancer",
         "adIPConfigID": "[concat(variables('adNicId'),'/ipConfigurations/ipconfig1')]",
-        "adlbID":"[resourceId('Microsoft.Network/loadBalancers',variables('publicLBName'))]",
-        "adlbFEConfigID":"[concat(variables('adlbID'),'/frontendIPConfigurations/',variables('LBFE'))]",
-        "adRDPNATRuleID":"[concat(variables('adlbID'),'/inboundNatRules/',variables('RDPNAT'))]",
-        "adBEAddressPoolID":"[concat(variables('adlbID'),'/backendAddressPools/',variables('LBBE'))]",
+        "publiclbID":"[resourceId('Microsoft.Network/loadBalancers',variables('publicLBName'))]",
+        "publiclbFEConfigID":"[concat(variables('publiclbID'),'/frontendIPConfigurations/',variables('LBFE'))]",
+        "adRDPNATRuleID":"[concat(variables('publiclbID'),'/inboundNatRules/',variables('RDPNAT'))]",
+        "publicBEAddressPoolID":"[concat(variables('publiclbID'),'/backendAddressPools/',variables('LBBE'))]",
         "sqllbID":"[resourceId('Microsoft.Network/loadBalancers',variables('sqlLBName'))]",
         "sqllbFEConfigID":"[concat(variables('sqllbID'),'/frontendIPConfigurations/',variables('LBFE'))]",
         "sqllbProbeID":"[concat(variables('sqllbID'),'/probes/',variables('SQLAOProbe'))]",
-        "sqlRDPNATRuleID":"[concat(variables('sqllbID'),'/inboundNatRules/',variables('RDPNAT'))]",
         "sqlBEAddressPoolID":"[concat(variables('sqllbID'),'/backendAddressPools/',variables('LBBE'))]",
         "adDataDiskSize":1000,
         "sqlDataDiskSize":1000,
@@ -310,7 +311,8 @@
         "sqlAOPrepareModulesURL":"[concat(parameters('AssetLocation'),'/PrepareAlwaysOnSqlServer.ps1.zip')]",
         "sqlAOPrepareConfigurationFunction":"PrepareAlwaysOnSqlServer.ps1\\PrepareAlwaysOnSqlServer",
         "createClusterModulesURL":"[concat(parameters('AssetLocation'),'/CreateFailoverCluster.ps1.zip')]",
-        "createClusterConfigurationFunction":"CreateFailoverCluster.ps1\\CreateFailoverCluster"
+        "createClusterConfigurationFunction":"CreateFailoverCluster.ps1\\CreateFailoverCluster",
+        "noOfSqlVMs":2
     },
     "resources": [
         {
@@ -393,7 +395,7 @@
                         "name": "[variables('RDPNAT')]",
                         "properties": {
                             "frontendIPConfiguration": {
-                                "id": "[variables('adlbFEConfigID')]"
+                                "id": "[variables('publiclbFEConfigID')]"
                             },
                             "protocol": "tcp",
                             "frontendPort": "[parameters('RDPPort')]",
@@ -481,7 +483,7 @@
                             },
                             "loadBalancerBackendAddressPools": [
                                 {
-                                    "id":"[variables('adBEAddressPoolID')]"
+                                    "id":"[variables('publicBEAddressPoolID')]"
                                 }
                             ],
                             "loadBalancerInboundNatRules": [
@@ -524,7 +526,7 @@
             "apiVersion": "2014-12-01-preview",
             "copy": {
                 "name": "nicLoop",
-                "count": 2
+                "count": "[variables('noOfSqlVMs')]"
             },
             "dependsOn": [
                 "[parameters('virtualNetworkName')]",
@@ -788,7 +790,7 @@
             "location": "[parameters('deploymentLocation')]",
             "copy": {
                 "name": "virtualMachineLoop",
-                "count": 2
+                "count": "[variables('noOfSqlVMs')]"
             },
             "dependsOn": [
                 "[resourceId('Microsoft.Storage/storageAccounts',parameters('newStorageAccountName'))]",
@@ -988,16 +990,16 @@
                         "DomainName": "[parameters('domainName')]",
                         "ClusterName":"[variables('clusterName')]",
                         "SharePath":"[concat('\\\\',variables('sqlwVMName'),'\\',variables('sharePath'))]",
-                        "Nodes":"[concat('\"',variables('sqlVMName'),'0\",\"',variables('sqlVMName'),'1\"')]",
+                        "Nodes":["[concat('\"',variables('sqlVMName'),'0\",\"',variables('sqlVMName'),'1\"')]"],
                         "SqlAlwaysOnEndpointName":"[variables('sqlAOEPName')]",
-                        "SqlAlwaysOnAvailabilityGroupName":"",
-                        "SqlAlwaysOnAvailabilityGroupListenerName":"",
-                        "SqlAlwaysOnAvailabilityGroupListenerPort":"",
+                        "SqlAlwaysOnAvailabilityGroupName":"[variables('sqlAOAGName')]",
+                        "SqlAlwaysOnAvailabilityGroupListenerName":"[variables('sqlAOListenerName')]",
+                        "SqlAlwaysOnAvailabilityGroupListenerPort":1433,
                         "LBName":"[variables('sqlLBName')]",
-                        "LBAddress":"[reference(variables('sqlLBName')).privateIPAddress]",
+                        "LBAddress":"10.0.0.6",
                         "PrimaryReplica":"[concat(variables('sqlVMName'),'1')]",
                         "SecondaryReplica":"[concat(variables('sqlVMName'),'0')]",
-                        "DatabaseNames":"[parameters('databaseNames')]",
+                        "DatabaseNames":["[parameters('databaseNames')]"],
                         "AdminCreds":{
                             "UserName": "[parameters('adminUserName')]",
                             "Password": "PrivateSettingsRef:AdminPassword"
