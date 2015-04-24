@@ -30,7 +30,7 @@ configuration CreateFailoverCluster
         [Parameter(Mandatory)]
         [String]$SqlAlwaysOnAvailabilityGroupListenerName,
 
-        [UInt32]$SqlAlwaysOnAvailabilityGroupListenerPort,
+        [UInt32]$SqlAlwaysOnAvailabilityGroupListenerPort=1433,
 
         [Parameter(Mandatory)]
         [String]$LBName,
@@ -60,6 +60,7 @@ configuration CreateFailoverCluster
     Import-DscResource -ModuleName xComputerManagement, xFailOverCluster,CDisk,xActiveDirectory,XDisk,xSqlPs,xNetworking, xSql, xSQLServer
     [System.Management.Automation.PSCredential]$DomainCreds = New-Object System.Management.Automation.PSCredential ("${DomainNetbiosName}\$($Admincreds.UserName)", $Admincreds.Password)
     [System.Management.Automation.PSCredential]$SQLCreds = New-Object System.Management.Automation.PSCredential ("${DomainNetbiosName}\$($SQLServiceCreds.UserName)", $SQLServiceCreds.Password)
+    [string]$DomainNameFqdn="${LBName}.${DomainName}"
     
     WaitForSqlSetup
 
@@ -300,8 +301,22 @@ configuration CreateFailoverCluster
             ActionAfterReboot = 'StopConfiguration'
         }
     }
-
-    
+}
+function WaitForSqlSetup
+{
+    # Wait for SQL Server Setup to finish before proceeding.
+    while ($true)
+    {
+        try
+        {
+            Get-ScheduledTaskInfo "\ConfigureSqlImageTasks\RunConfigureImage" -ErrorAction Stop
+            Start-Sleep -Seconds 5
+        }
+        catch
+        {
+            break
+        }
+    }
 }
 function Get-NetBIOSName
 { 
