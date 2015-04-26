@@ -42,7 +42,7 @@
             },
             "defaultValue":"sqlAwlaysOnVNET"
         },
-        "virtualNetworkPrefix": {
+        "virtualNetworkAddressRange": {
             "type": "string",
             "metadata": {
                 "Description": "The address range of the new VNET in CIDR format"
@@ -360,7 +360,7 @@
             "properties": {
                 "addressSpace": {
                 "addressPrefixes": [
-                    "[parameters('virtualNetworkPrefix')]"
+                    "[parameters('virtualNetworkAddressRange')]"
                 ]
                 },
                 "subnets": "[variables('subnets')]"
@@ -673,7 +673,7 @@
                 "parameters": {
                     "deploymentLocation": {"value":"[parameters('deploymentLocation')]"},
                     "virtualNetworkName": {"value":"[parameters('virtualNetworkName')]"},
-                    "virtualNetworkAddressRange": {"value":"[parameters('virtualNetworkPrefix')]"},
+                    "virtualNetworkAddressRange": {"value":"[parameters('virtualNetworkAddressRange')]"},
                     "subnets": {"value":"[variables('subnets')]"},
                     "DNSServerAddress": {"value":["[parameters('adPDCNicIPAddress')]"]}
                 }
@@ -777,7 +777,7 @@
                 "parameters": {
                     "deploymentLocation": {"value":"[parameters('deploymentLocation')]"},
                     "virtualNetworkName": {"value":"[parameters('virtualNetworkName')]"},
-                    "virtualNetworkAddressRange": {"value":"[parameters('virtualNetworkPrefix')]"},
+                    "virtualNetworkAddressRange": {"value":"[parameters('virtualNetworkAddressRange')]"},
                     "subnets": {"value":"[variables('subnets')]"},
                     "DNSServerAddress": {"value":["[parameters('adPDCNicIPAddress')]","[parameters('adBDCNicIPAddress')]"]}
                 }
@@ -999,7 +999,7 @@
                         "LBAddress":"[parameters('SQLLBIPAddress')]",
                         "PrimaryReplica":"[concat(variables('sqlVMName'),'1')]",
                         "SecondaryReplica":"[concat(variables('sqlVMName'),'0')]",
-                        "DatabaseNames":["[parameters('databaseNames')]"],
+                        "DatabaseNames":"[parameters('databaseNames')]",
                         "DNSServerName":"[variables('adPDCVMName')]",
                         "AdminCreds":{
                             "UserName": "[parameters('adminUserName')]",

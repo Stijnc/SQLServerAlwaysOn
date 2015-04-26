@@ -3,10 +3,10 @@
 	"contentVersion": "1.0.0.0",
 	"parameters": {
 		"newStorageAccountName": {
-			"value": "sdsqlag9"
+			"value": "sdsqlag11"
 		},
 		"dnsPrefix":{
-			"value":"sdsqlag9"
+			"value":"sdsqlag11"
 		},
 		"AssetLocation" :{
 			"value":"https://raw.githubusercontent.com/simongdavies/SQLServerAlwaysOn/master/"
