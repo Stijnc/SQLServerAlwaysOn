@@ -234,11 +234,11 @@
             "defaultValue":"New DNS Prefix"
         },
         "dataBaseNames": {
-            "type":"string",
+            "type":"array",
             "metadata": {
                 "Description": "An array of databases name, each database will be created and added to the availability group"
             },
-            "defaultValue":"'testdb1','testdb2'"
+            "defaultValue":["testdb1","testdb2"]
         }
 
     },
@@ -990,16 +990,17 @@
                         "DomainName": "[parameters('domainName')]",
                         "ClusterName":"[variables('clusterName')]",
                         "SharePath":"[concat('\\\\',variables('sqlwVMName'),'\\',variables('sharePath'))]",
-                        "Nodes":["[concat('\"',variables('sqlVMName'),'0\",\"',variables('sqlVMName'),'1\"')]"],
+                        "Nodes":["[concat(variables('sqlVMName'),'0')]","[concat(variables('sqlVMName'),'1')]"],
                         "SqlAlwaysOnEndpointName":"[variables('sqlAOEPName')]",
                         "SqlAlwaysOnAvailabilityGroupName":"[variables('sqlAOAGName')]",
                         "SqlAlwaysOnAvailabilityGroupListenerName":"[variables('sqlAOListenerName')]",
                         "SqlAlwaysOnAvailabilityGroupListenerPort":1433,
                         "LBName":"[variables('sqlLBName')]",
-                        "LBAddress":"10.0.0.6",
+                        "LBAddress":"[parameters('SQLLBIPAddress')]",
                         "PrimaryReplica":"[concat(variables('sqlVMName'),'1')]",
                         "SecondaryReplica":"[concat(variables('sqlVMName'),'0')]",
                         "DatabaseNames":["[parameters('databaseNames')]"],
+                        "DNSServerName":"[variables('adPDCVMName')]",
                         "AdminCreds":{
                             "UserName": "[parameters('adminUserName')]",
                             "Password": "PrivateSettingsRef:AdminPassword"
