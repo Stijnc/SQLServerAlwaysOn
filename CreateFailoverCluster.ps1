@@ -66,9 +66,7 @@ configuration CreateFailoverCluster
     [string]$LBFQName="${LBName}.${DomainName}"
     
     Enable-CredSSPNTLM -DomainName $DomainName
-    $DNSServerFQName="${DNSServerName}.${DomainName}"
-    Invoke-command -ScriptBlock ${Function:Update-DNS} -ArgumentList $LBName,$LBAddress,$DomainName -ComputerName $DNSServerFQName -Credential $DomainCreds
-   
+    
     WaitForSqlSetup
 
     Node localhost
@@ -270,7 +268,15 @@ configuration CreateFailoverCluster
             DomainCredential =$DomainCreds
             SqlAdministratorCredential = $Admincreds
         }
-       
+        
+        xSQLAddListenerIPToDNS UpdateDNSServer
+        {      
+            Credential =$DomainCreds
+            LBName=$LBName
+            LBAddress=$LBAddress
+            DomainName=$DomainName 
+            DNSServerName=$DNSServerName 
+        }
 
         xSqlAvailabilityGroupListener SqlAGListener
         {
